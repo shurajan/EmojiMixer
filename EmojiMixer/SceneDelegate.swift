@@ -19,7 +19,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let scene = (scene as? UIWindowScene) else { return }
         window = UIWindow(windowScene: scene)
         
-        let emojiMixerViewController = EmojiMixerViewController()
+        
+        let emojiMixerViewController = UINavigationController(rootViewController: EmojiMixerViewController())
         
         window?.rootViewController = emojiMixerViewController
         window?.makeKeyAndVisible()

@@ -8,12 +8,48 @@
 import UIKit
 
 class EmojiMixerViewController: UIViewController  {
+    //MARK: - UI components
+    private var constraints = [NSLayoutConstraint]()
+    
+    private lazy var plusButton: UIButton = {
+        let button = UIButton()
+        button.setImage(UIImage(systemName: "plus"), for: UIControl.State.normal)
+        button.accessibilityIdentifier = "plusButton"
+        button.addTarget(self, action: #selector(plusButtonTapped(_:)), for: .touchUpInside)
+        
+        constraints.append(contentsOf: [
+            button.widthAnchor.constraint(equalToConstant: 44),
+            button.heightAnchor.constraint(equalToConstant: 44),
+        ])
+        return button
+    }()
+    
+    private lazy var undoButton: UIButton = {
+        let button = UIButton()
+
+        button.setTitle("Undo", for: .normal)
+        button.setTitleColor(.blue, for: .normal)
+        button.setTitleColor(.red, for: .highlighted)
+        
+        button.accessibilityIdentifier = "undoButton"
+        button.addTarget(self, action: #selector(undoButtonTapped(_:)), for: .touchUpInside)
+        
+        constraints.append(contentsOf: [
+            button.widthAnchor.constraint(equalToConstant: 44),
+            button.heightAnchor.constraint(equalToConstant: 44),
+        ])
+        return button
+    }()
+    
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
     
-    private let emojis = [ "🍇", "🍈", "🍉", "🍊", "🍋", "🍌", "🍍", "🥭", "🍎", "🍏",
+    private let availableEmojis = [ "🍇", "🍈", "🍉", "🍊", "🍋", "🍌", "🍍", "🥭", "🍎", "🍏",
                            "🍐", "🍒", "🍓", "🫐", "🥝", "🍅", "🫒", "🥥", "🥑", "🍆",
                            "🥔", "🥕", "🌽", "🌶️", "🫑", "🥒", "🥬", "🥦", "🧄", "🧅",
                            "🍄"]
+    
+    private var emojis = [String]()
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,11 +58,14 @@ class EmojiMixerViewController: UIViewController  {
     }
     
     private func drawSelf() {
+        addView(control: plusButton)
+        addView(control: undoButton)
+        addView(control: collectionView)
         
-        view.addSubview(collectionView)
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: plusButton)
+        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: undoButton)
         
-        NSLayoutConstraint.activate([
+        constraints.append(contentsOf: [
             collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -38,6 +77,37 @@ class EmojiMixerViewController: UIViewController  {
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionView.allowsMultipleSelection = false
+        
+        addAndActivateConstraints(from: constraints)
+    }
+    
+   final func addView(control newControl: UIView) {
+        newControl.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(newControl)
+    }
+    
+    final func addAndActivateConstraints(from controlConstraints:[NSLayoutConstraint] = []) {
+        constraints.append(contentsOf: controlConstraints)
+        NSLayoutConstraint.activate(constraints)
+    }
+    
+    @IBAction private func undoButtonTapped(_ sender: UIButton) {
+        if emojis.count == 0 {return}
+        let index = emojis.count-1
+        emojis.removeLast()
+        
+        collectionView.performBatchUpdates {
+            collectionView.deleteItems(at: [IndexPath(row: index, section: 0)])
+        }
+    }
+    
+    @IBAction private func plusButtonTapped(_ sender: UIButton) {
+        let emoji = availableEmojis[Int.random(in: 0..<availableEmojis.count)]
+        emojis.append(emoji)
+        
+        collectionView.performBatchUpdates {
+            collectionView.insertItems(at: [IndexPath(row: emojis.count-1, section: 0)])
+        }
     }
 }
 
@@ -47,9 +117,12 @@ extension EmojiMixerViewController: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cell", for: indexPath) as? EmojiMixerCollectionViewCell
-        cell?.titleLabel.text = emojis[indexPath.row]
-        return cell!
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "cell", for: indexPath) as? EmojiMixerCollectionViewCell else {
+            return UICollectionViewCell()
+        }
+        
+        cell.titleLabel.text = emojis[indexPath.row]
+        return cell
     }
     
 }
