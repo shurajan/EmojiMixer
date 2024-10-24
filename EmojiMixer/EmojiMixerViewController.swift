@@ -11,6 +11,7 @@ class EmojiMixerViewController: UIViewController  {
     //MARK: - UI components
     private var constraints = [NSLayoutConstraint]()
     private let factory = EmojiMixFactory()
+    private let emojiMixStore = EmojiMixStore()
     
     private lazy var plusButton: UIButton = {
         let button = UIButton()
@@ -36,6 +37,7 @@ class EmojiMixerViewController: UIViewController  {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         drawSelf()
+        try? visibleEmojiMixes = fetchEmojiMixes()
     }
     
     private func drawSelf() {
@@ -72,11 +74,17 @@ class EmojiMixerViewController: UIViewController  {
         NSLayoutConstraint.activate(constraints)
     }
     
+    private func fetchEmojiMixes() throws -> [EmojiMix] {
+        try emojiMixStore.fetchEmojiMixes()
+    }
+    
     @IBAction private func plusButtonTapped(_ sender: UIButton) {
         
         let mix = factory.createEmojiMix()
         
-        visibleEmojiMixes.append(mix)
+        try? emojiMixStore.addNewEmojiMix(mix)
+        
+        try? visibleEmojiMixes = fetchEmojiMixes()
         
         collectionView.performBatchUpdates {
             collectionView.insertItems(at: [IndexPath(row: visibleEmojiMixes.count-1, section: 0)])
