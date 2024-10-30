@@ -37,6 +37,7 @@ class EmojiMixerViewController: UIViewController  {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
         drawSelf()
+        emojiMixStore.delegate = self
         try? visibleEmojiMixes = fetchEmojiMixes()
     }
     
@@ -84,11 +85,11 @@ class EmojiMixerViewController: UIViewController  {
         
         try? emojiMixStore.addNewEmojiMix(mix)
         
-        try? visibleEmojiMixes = fetchEmojiMixes()
+        /*try? visibleEmojiMixes = fetchEmojiMixes()
         
         collectionView.performBatchUpdates {
             collectionView.insertItems(at: [IndexPath(row: visibleEmojiMixes.count-1, section: 0)])
-        }
+        }*/
     }
 }
 
@@ -123,4 +124,20 @@ extension EmojiMixerViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 0
     }
+}
+
+extension EmojiMixerViewController: DataProviderDelegate {
+    func didUpdate(_ update: EmojiMixStoreUpdate) {
+        try? visibleEmojiMixes = fetchEmojiMixes()
+        
+        collectionView.performBatchUpdates {
+            let insertedIndexPaths = update.insertedIndexes.map { IndexPath(item: $0, section: 0) }
+            let deletedIndexPaths = update.deletedIndexes.map { IndexPath(item: $0, section: 0) }
+            collectionView.insertItems(at: insertedIndexPaths)
+            collectionView.deleteItems(at: deletedIndexPaths)
+        }
+        
+    }
+    
+    
 }

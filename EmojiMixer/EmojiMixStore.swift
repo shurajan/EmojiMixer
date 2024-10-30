@@ -7,10 +7,39 @@ enum EmojiMixStoreError: Error {
     case decodingErrorInvalidColorHex
 }
 
-final class EmojiMixStore {
+struct EmojiMixStoreUpdate {
+    let insertedIndexes: IndexSet
+    let deletedIndexes: IndexSet
+}
+
+protocol DataProviderDelegate: AnyObject {
+    func didUpdate(_ update: EmojiMixStoreUpdate)
+}
+
+
+
+final class EmojiMixStore: NSObject {
     private let context: NSManagedObjectContext
+    weak var delegate: DataProviderDelegate?
+    private var insertedIndexes: IndexSet?
+    private var deletedIndexes: IndexSet?
     
-    convenience init() {
+    private lazy var fetchedResultsController: NSFetchedResultsController<EmojiMixCoreData> = {
+        
+        let fetchRequest = NSFetchRequest<EmojiMixCoreData>(entityName: "EmojiMixCoreData")
+        fetchRequest.sortDescriptors = [NSSortDescriptor(keyPath: \EmojiMixCoreData.emojis, ascending: true)]
+        
+        let fetchedResultsController = NSFetchedResultsController(fetchRequest: fetchRequest,
+                                                                  managedObjectContext: context,
+                                                                  sectionNameKeyPath: nil,
+                                                                  cacheName: nil)
+        fetchedResultsController.delegate = self
+        try? fetchedResultsController.performFetch()
+        return fetchedResultsController
+    }()
+    
+   
+    convenience override init() {
         let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
         self.init(context: context)
     }
@@ -20,9 +49,11 @@ final class EmojiMixStore {
     }
     
     func fetchEmojiMixes() throws -> [EmojiMix] {
-        let fetchRequest = EmojiMixCoreData.fetchRequest()
-        let emojiMixesFromCoreData = try context.fetch(fetchRequest)
-        return try emojiMixesFromCoreData.map { try self.emojiMix(from: $0) }
+        guard
+            let objects = self.fetchedResultsController.fetchedObjects,
+            let emojiMixes = try? objects.map({ try self.emojiMix(from: $0) })
+        else { return [] }
+        return emojiMixes
     }
     
     func addNewEmojiMix(_ emojiMix: EmojiMix) throws {
@@ -31,26 +62,70 @@ final class EmojiMixStore {
         try context.save()
     }
     
-    func updateExistingEmojiMix(_ emojiMixCorData: EmojiMixCoreData, with mix: EmojiMix) {
-        emojiMixCorData.emojis = mix.emojis
-        emojiMixCorData.colorHex = mix.backgroundColor.toHexString()
+    func updateExistingEmojiMix(_ emojiMixCoreData: EmojiMixCoreData, with mix: EmojiMix) {
+        emojiMixCoreData.emojis = mix.emojis
+        emojiMixCoreData.colorHex = mix.backgroundColor.toHexString()
     }
     
-    func emojiMix(from emojiMixCorData: EmojiMixCoreData) throws -> EmojiMix {
-        guard let emojies = emojiMixCorData.emojis else {
+    func emojiMix(from emojiMixCoreData: EmojiMixCoreData) throws -> EmojiMix {
+        guard let emojies = emojiMixCoreData.emojis else {
             throw EmojiMixStoreError.decodingErrorInvalidEmojies
         }
-        guard let colorHex = emojiMixCorData.colorHex,
+        guard let colorHex = emojiMixCoreData.colorHex,
                let color = UIColor(hex: colorHex)
         else {
             throw EmojiMixStoreError.decodingErrorInvalidEmojies
         }
         
-        
         return EmojiMix(
             emojis: emojies,
             backgroundColor: color
         )
+    }
+    
+}
+
+
+extension EmojiMixStore: NSFetchedResultsControllerDelegate {
+    func controllerWillChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        insertedIndexes = IndexSet()
+        deletedIndexes = IndexSet()
+    }
+   
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didChange anObject: Any, at indexPath: IndexPath?, for type: NSFetchedResultsChangeType, newIndexPath: IndexPath?) {
+        switch type {
+        case .insert:
+            if let newIndexPath {
+                insertedIndexes?.insert(newIndexPath.item)
+            }
+            
+        case .delete:
+            if let newIndexPath {
+                deletedIndexes?.insert(newIndexPath.item)
+            }
+        case .update:
+            print("Unsuported")
+        case .move:
+            print("Unsuported")
+        @unknown default:
+            fatalError("Unexpected NSFetchedResultsChangeType")
+        }
+    }
+    
+    func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
+        guard let insertedIndexes,
+              let deletedIndexes
+        else {return}
+        
+        let update = EmojiMixStoreUpdate(
+            insertedIndexes: insertedIndexes,
+            deletedIndexes: deletedIndexes
+        )
+        
+        delegate?.didUpdate(update)
+        
+        self.deletedIndexes = nil
+        self.insertedIndexes = nil
     }
     
 }
