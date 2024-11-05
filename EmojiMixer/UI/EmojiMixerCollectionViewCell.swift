@@ -8,8 +8,21 @@
 import UIKit
 
 class EmojiMixerCollectionViewCell: UICollectionViewCell {
-    // Здесь будет код нашей ячейки
-    let titleLabel = UILabel()
+    private let titleLabel = UILabel()
+    
+    var viewModel: EmojiMixViewModel?  {
+        didSet {
+            viewModel?.onEmojiChanged = { [weak self] emojis in
+                guard let self else { return }
+                self.titleLabel.text = emojis
+            }
+            
+            viewModel?.onBackgroundColorChanged = {[weak self] color in
+                guard let self else { return }
+                self.contentView.backgroundColor = color
+            }
+        }
+    }
     
     override init(frame: CGRect) {
         super.init(frame: frame)

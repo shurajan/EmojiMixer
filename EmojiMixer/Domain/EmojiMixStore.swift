@@ -12,15 +12,14 @@ struct EmojiMixStoreUpdate {
     let deletedIndexes: IndexSet
 }
 
-protocol DataProviderDelegate: AnyObject {
-    func didUpdate(_ update: EmojiMixStoreUpdate)
+protocol EmojiMixStoreDelegate: AnyObject {
+    func storeDidUpdate()
 }
-
 
 
 final class EmojiMixStore: NSObject {
     private let context: NSManagedObjectContext
-    weak var delegate: DataProviderDelegate?
+    weak var delegate: EmojiMixStoreDelegate?
     private var insertedIndexes: IndexSet?
     private var deletedIndexes: IndexSet?
     
@@ -59,6 +58,14 @@ final class EmojiMixStore: NSObject {
     func addNewEmojiMix(_ emojiMix: EmojiMix) throws {
         let emojiMixCoreData = EmojiMixCoreData(context: context)
         updateExistingEmojiMix(emojiMixCoreData, with: emojiMix)
+        try context.save()
+    }
+    
+    func deleteAll() throws {
+        let objects = fetchedResultsController.fetchedObjects ?? []
+        for object in objects {
+            context.delete(object)
+        }
         try context.save()
     }
     
@@ -113,19 +120,7 @@ extension EmojiMixStore: NSFetchedResultsControllerDelegate {
     }
     
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
-        guard let insertedIndexes,
-              let deletedIndexes
-        else {return}
-        
-        let update = EmojiMixStoreUpdate(
-            insertedIndexes: insertedIndexes,
-            deletedIndexes: deletedIndexes
-        )
-        
-        delegate?.didUpdate(update)
-        
-        self.deletedIndexes = nil
-        self.insertedIndexes = nil
+        delegate?.storeDidUpdate()
     }
     
 }

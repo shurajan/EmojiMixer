@@ -8,46 +8,50 @@
 import UIKit
 
 class EmojiMixerViewController: UIViewController  {
+    private var viewModel: EmojiMixesViewModel?
+    
     //MARK: - UI components
     private var constraints = [NSLayoutConstraint]()
-    private let factory = EmojiMixFactory()
-    private let emojiMixStore = EmojiMixStore()
-    
-    private lazy var plusButton: UIButton = {
-        let button = UIButton()
-        button.setImage(UIImage(systemName: "plus"), for: UIControl.State.normal)
-        button.accessibilityIdentifier = "plusButton"
-        button.addTarget(self, action: #selector(plusButtonTapped(_:)), for: .touchUpInside)
         
-        constraints.append(contentsOf: [
-            button.widthAnchor.constraint(equalToConstant: 44),
-            button.heightAnchor.constraint(equalToConstant: 44),
-        ])
-        return button
-    }()
-    
-    
     private let collectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
-
+    
     
     private var visibleEmojiMixes = [EmojiMix]()
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
         drawSelf()
-        emojiMixStore.delegate = self
-        try? visibleEmojiMixes = fetchEmojiMixes()
+        do {
+            viewModel = try EmojiMixesViewModel()
+        } catch {
+            print("\(error)")
+        }
+        
+        viewModel?.emojiMixesBinding = { [weak self] _ in
+            guard let self = self else { return }
+            self.collectionView.reloadData()
+        }
     }
     
     private func drawSelf() {
-        addView(control: plusButton)
+        
+        if let navBar = navigationController?.navigationBar {
+            let rightButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(plusButtonTapped))
+            navBar.topItem?.setRightBarButton(rightButton, animated: false)
+            
+            let leftButton = UIBarButtonItem(
+                title: NSLocalizedString("Delete All", comment: ""),
+                style: .plain,
+                target: self,
+                action: #selector(deleteAll)
+            )
+            navBar.topItem?.setLeftBarButton(leftButton, animated: false)
+            
+        }
         addView(control: collectionView)
         
         collectionView.contentInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
-        
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: plusButton)
         
         constraints.append(contentsOf: [
             collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -75,27 +79,18 @@ class EmojiMixerViewController: UIViewController  {
         NSLayoutConstraint.activate(constraints)
     }
     
-    private func fetchEmojiMixes() throws -> [EmojiMix] {
-        try emojiMixStore.fetchEmojiMixes()
+    @IBAction private func plusButtonTapped(_ sender: UIButton) {
+        viewModel?.addEmojiMix()
     }
     
-    @IBAction private func plusButtonTapped(_ sender: UIButton) {
-        
-        let mix = factory.createEmojiMix()
-        
-        try? emojiMixStore.addNewEmojiMix(mix)
-        
-        /*try? visibleEmojiMixes = fetchEmojiMixes()
-        
-        collectionView.performBatchUpdates {
-            collectionView.insertItems(at: [IndexPath(row: visibleEmojiMixes.count-1, section: 0)])
-        }*/
+    @IBAction private func deleteAll(_ sender: UIButton) {
+        viewModel?.deleteAll()
     }
 }
 
 extension EmojiMixerViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return visibleEmojiMixes.count
+        return viewModel?.emojiMixes.count ?? 0
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -103,8 +98,7 @@ extension EmojiMixerViewController: UICollectionViewDataSource {
             return UICollectionViewCell()
         }
         
-        cell.titleLabel.text = visibleEmojiMixes[indexPath.row].emojis
-        cell.backgroundColor = visibleEmojiMixes[indexPath.row].backgroundColor
+        cell.viewModel = viewModel?.emojiMixes[indexPath.row]
         cell.layer.cornerRadius = 8
         return cell
     }
@@ -124,20 +118,4 @@ extension EmojiMixerViewController: UICollectionViewDelegateFlowLayout {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
         return 0
     }
-}
-
-extension EmojiMixerViewController: DataProviderDelegate {
-    func didUpdate(_ update: EmojiMixStoreUpdate) {
-        try? visibleEmojiMixes = fetchEmojiMixes()
-        
-        collectionView.performBatchUpdates {
-            let insertedIndexPaths = update.insertedIndexes.map { IndexPath(item: $0, section: 0) }
-            let deletedIndexPaths = update.deletedIndexes.map { IndexPath(item: $0, section: 0) }
-            collectionView.insertItems(at: insertedIndexPaths)
-            collectionView.deleteItems(at: deletedIndexPaths)
-        }
-        
-    }
-    
-    
 }
